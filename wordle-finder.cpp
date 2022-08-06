@@ -75,10 +75,6 @@ read_words(const std::string &filename, bool dedupe_anagrams,
 }
 
 void
-sort_masks(std::vector<uint32_t> &bitmasks, std::vector<std::string> &words)
-{
-}
-void
 search(std::vector<const std::string *> &stack, unsigned mask,
        const std::vector<std::tuple<uint32_t, unsigned, int>> &results,
        const std::vector<int> &result_ptrs,
@@ -152,12 +148,11 @@ main(int argc, char *argv[])
       unsigned size = word_bitmasks.size();
       int bound = inner_loop_bounds[i];
       for (int j = word_bitmasks.size() - 1; j >= bound; --j) {
-         if ((word_bitmasks[j] & i))
+         if (word_bitmasks[j] & i)
             continue;
 
          uint32_t new_mask = i | word_bitmasks[j];
          has_solution[new_mask] = true;
-         // solutions[new_mask].push_back(j);
          int r = results.size();
          results.push_back(std::tuple<uint32_t, unsigned, int>(
             new_mask, j, result_ptrs[new_mask]));
