@@ -3,8 +3,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+// this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
@@ -16,15 +16,17 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -36,6 +38,7 @@ read_words(const std::string &filename, std::vector<uint32_t> &bitmasks,
    std::ifstream fin(filename);
    std::string word;
 
+   std::vector<std::pair<std::uint32_t, std::string>> data;
    std::vector<bool> dups(1u << 26);
    while (fin >> word) {
       if (word.size() != 5)
@@ -55,12 +58,21 @@ read_words(const std::string &filename, std::vector<uint32_t> &bitmasks,
       if (dups[bitmask])
          continue;
 
-      bitmasks.push_back(bitmask);
-      words.push_back(word);
+      data.push_back(std::make_pair(bitmask, word));
       dups[bitmask] = true;
+   }
+
+   std::sort(data.begin(), data.end());
+   for (auto &&e : data) {
+      bitmasks.push_back(e.first);
+      words.push_back(e.second);
    }
 }
 
+void
+sort_masks(std::vector<uint32_t> &bitmasks, std::vector<std::string> &words)
+{
+}
 void
 search(std::vector<const std::string *> &stack, unsigned mask,
        const std::vector<std::vector<unsigned>> &solutions,
@@ -107,42 +119,22 @@ main(int argc, char *argv[])
    // constraint described below).
    std::vector<std::vector<unsigned>> solutions(1u << 26);
 
-   std::vector<std::vector<std::pair<uint32_t, unsigned>>> words_by_clz(32);
-   for (unsigned i = 0; i < word_bitmasks.size(); ++i) {
-      words_by_clz[__builtin_clz(word_bitmasks[i])].push_back(
-         std::make_pair(word_bitmasks[i], i));
-   }
-
-   for (unsigned i = 1; i < (1u << 26); ++i) {
-      unsigned cnt = __builtin_popcount(i);
-      if (cnt % 5 != 0)
+   for (unsigned i = 0; i < (1u << 26); ++i) {
+      if (!has_solution[i])
          continue;
 
-      bool result = false;
+      unsigned size = word_bitmasks.size();
+      for (int j = word_bitmasks.size() - 1; j >= 0; --j) {
+         if (word_bitmasks[j] <= i)
+            break;
 
-      // We take only the words with the same "top" character as the
-      // mask, to avoid getting multiple solutions have the same words
-      // in a different order.
-      //
-      // Putting these in a dedicated list also means our inner loop
-      // has to go through significantly less iterations.
-      const auto &wordlist = words_by_clz[__builtin_clz(i)];
-
-      // Take stuff from vector to help avoid the pitfall of alias analysis not
-      // working that well.
-      unsigned size = wordlist.size();
-      const std::pair<uint32_t, unsigned> *word_ptr = wordlist.data();
-
-      for (unsigned j = 0; j < size; ++j) {
-         if ((~i & word_ptr[j].first) != 0)
+         if ((word_bitmasks[j] & i))
             continue;
 
-         if (has_solution[i - word_ptr[j].first]) {
-            result = true;
-            solutions[i].push_back(word_ptr[j].second);
-         }
+         uint32_t new_mask = i | word_bitmasks[j];
+         has_solution[new_mask] = true;
+         solutions[new_mask].push_back(j);
       }
-      has_solution[i] = result;
    }
 
    // We still end up doing a recursive search, but due to our
