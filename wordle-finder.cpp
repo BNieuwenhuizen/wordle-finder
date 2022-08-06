@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include <vector>
 
 void
@@ -75,7 +76,8 @@ sort_masks(std::vector<uint32_t> &bitmasks, std::vector<std::string> &words)
 }
 void
 search(std::vector<const std::string *> &stack, unsigned mask,
-       const std::vector<std::vector<unsigned>> &solutions,
+       const std::vector<std::tuple<uint32_t, unsigned, int>> &results,
+       const std::vector<int> &result_ptrs,
        const std::vector<uint32_t> &bitmasks,
        const std::vector<std::string> &words)
 {
@@ -89,9 +91,12 @@ search(std::vector<const std::string *> &stack, unsigned mask,
       return;
    }
 
-   for (auto e : solutions[mask]) {
+   int r = result_ptrs[mask];
+   while (r >= 0) {
+      auto e = std::get<1>(results[r]);
+      r = std::get<2>(results[r]);
       stack.push_back(&words[e]);
-      search(stack, mask & ~bitmasks[e], solutions, bitmasks, words);
+      search(stack, mask & ~bitmasks[e], results, result_ptrs, bitmasks, words);
       stack.pop_back();
    }
 }
@@ -120,10 +125,9 @@ main(int argc, char *argv[])
          ++j;
       inner_loop_bounds[i] = j;
    }
-   // These vectors are for figuring out the actual solutions. It contains
-   // the indices of words that lead to a solution (subject to the clz
-   // constraint described below).
-   std::vector<std::vector<unsigned>> solutions(1u << 26);
+
+   std::vector<std::tuple<uint32_t, unsigned, int>> results;
+   std::vector<int> result_ptrs(1u << 26, -1);
 
    for (unsigned i = 0; i < (1u << 26); ++i) {
       if (!has_solution[i])
@@ -137,7 +141,11 @@ main(int argc, char *argv[])
 
          uint32_t new_mask = i | word_bitmasks[j];
          has_solution[new_mask] = true;
-         solutions[new_mask].push_back(j);
+         // solutions[new_mask].push_back(j);
+         int r = results.size();
+         results.push_back(std::tuple<uint32_t, unsigned, int>(
+            new_mask, j, result_ptrs[new_mask]));
+         result_ptrs[new_mask] = r;
       }
    }
 
@@ -147,7 +155,7 @@ main(int argc, char *argv[])
    for (unsigned i = 0; i < 26; ++i) {
       uint32_t mask = ((1u << 26) - 1) & ~(1u << i);
       std::vector<const std::string *> stack;
-      search(stack, mask, solutions, word_bitmasks, words);
+      search(stack, mask, results, result_ptrs, word_bitmasks, words);
    }
    return 0;
 }
