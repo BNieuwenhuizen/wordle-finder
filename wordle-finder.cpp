@@ -114,6 +114,12 @@ main(int argc, char *argv[])
    std::vector<bool> has_solution(1u << 26);
    has_solution[0] = true;
 
+   std::vector<int> inner_loop_bounds(1u << 26);
+   for (int i = 0, j = 0; i < (int)inner_loop_bounds.size(); ++i) {
+      while (j < word_bitmasks.size() && word_bitmasks[j] <= i)
+         ++j;
+      inner_loop_bounds[i] = j;
+   }
    // These vectors are for figuring out the actual solutions. It contains
    // the indices of words that lead to a solution (subject to the clz
    // constraint described below).
@@ -124,10 +130,8 @@ main(int argc, char *argv[])
          continue;
 
       unsigned size = word_bitmasks.size();
-      for (int j = word_bitmasks.size() - 1; j >= 0; --j) {
-         if (word_bitmasks[j] <= i)
-            break;
-
+      int bound = inner_loop_bounds[i];
+      for (int j = word_bitmasks.size() - 1; j >= bound; --j) {
          if ((word_bitmasks[j] & i))
             continue;
 
