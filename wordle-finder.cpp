@@ -127,13 +127,19 @@ main(int argc, char *argv[])
       // Putting these in a dedicated list also means our inner loop
       // has to go through significantly less iterations.
       const auto &wordlist = words_by_clz[__builtin_clz(i)];
-      for (unsigned j = 0; j < wordlist.size(); ++j) {
-         if ((~i & wordlist[j].first) != 0)
+
+      // Take stuff from vector to help avoid the pitfall of alias analysis not
+      // working that well.
+      unsigned size = wordlist.size();
+      const std::pair<uint32_t, unsigned> *word_ptr = wordlist.data();
+
+      for (unsigned j = 0; j < size; ++j) {
+         if ((~i & word_ptr[j].first) != 0)
             continue;
 
-         if (has_solution[i - wordlist[j].first]) {
+         if (has_solution[i - word_ptr[j].first]) {
             result = true;
-            solutions[i].push_back(wordlist[j].second);
+            solutions[i].push_back(word_ptr[j].second);
          }
       }
       has_solution[i] = result;
