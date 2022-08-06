@@ -27,14 +27,16 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <tuple>
 #include <vector>
 
 void
-read_words(const std::string &filename, std::vector<uint32_t> &bitmasks,
-           std::vector<std::string> &words)
+read_words(const std::string &filename, bool dedupe_anagrams,
+           std::vector<uint32_t> &bitmasks,
+           std::vector<std::vector<std::string>> &words)
 {
    std::ifstream fin(filename);
    std::string word;
@@ -56,17 +58,19 @@ read_words(const std::string &filename, std::vector<uint32_t> &bitmasks,
       if (!valid)
          continue;
 
-      if (dups[bitmask])
-         continue;
-
       data.push_back(std::make_pair(bitmask, word));
       dups[bitmask] = true;
    }
 
    std::sort(data.begin(), data.end());
-   for (auto &&e : data) {
-      bitmasks.push_back(e.first);
-      words.push_back(e.second);
+   for (unsigned i = 0; i < data.size(); ++i) {
+      if (i && data[i].first == data[i - 1].first) {
+         if (!dedupe_anagrams)
+            words.back().push_back(data[i].second);
+      } else {
+         bitmasks.push_back(data[i].first);
+         words.push_back({data[i].second});
+      }
    }
 }
 
@@ -79,7 +83,7 @@ search(std::vector<const std::string *> &stack, unsigned mask,
        const std::vector<std::tuple<uint32_t, unsigned, int>> &results,
        const std::vector<int> &result_ptrs,
        const std::vector<uint32_t> &bitmasks,
-       const std::vector<std::string> &words)
+       const std::vector<std::vector<std::string>> &words)
 {
    if (mask == 0) {
       for (unsigned i = 0; i < stack.size(); ++i) {
@@ -95,24 +99,35 @@ search(std::vector<const std::string *> &stack, unsigned mask,
    while (r >= 0) {
       auto e = std::get<1>(results[r]);
       r = std::get<2>(results[r]);
-      stack.push_back(&words[e]);
-      search(stack, mask & ~bitmasks[e], results, result_ptrs, bitmasks, words);
-      stack.pop_back();
+      for (const auto &w : words[e]) {
+         stack.push_back(&w);
+         search(stack, mask & ~bitmasks[e], results, result_ptrs, bitmasks,
+                words);
+         stack.pop_back();
+      }
    }
 }
 
 int
 main(int argc, char *argv[])
 {
-   if (argc != 2) {
-      std::cerr << "Expected usage: ./wordle-finder word-list-file\n";
+   if (argc < 2 || argc > 3) {
+      std::cerr << "Expected usage: ./wordle-finder [--dedupe-anagrams] "
+                   "word-list-file\n";
+      return 1;
+   }
+
+   if (argc == 3 && std::strcmp(argv[1], "--dedupe-anagrams") != 0) {
+      std::cerr << "Invalid option \"" << argv[1]
+                << "\", expected --dedupe-anagrams\n";
       return 1;
    }
 
    std::vector<uint32_t> word_bitmasks;
-   std::vector<std::string> words;
+   std::vector<std::vector<std::string>> words;
 
-   read_words(argv[1], word_bitmasks, words);
+   bool dedupe_anagrams = argc == 3;
+   read_words(argv[argc - 1], dedupe_anagrams, word_bitmasks, words);
 
    // The core Dynamic Programming state. has_solution[i] states whether
    // there is a solution that uses exactly the characters from mask i.
@@ -120,8 +135,9 @@ main(int argc, char *argv[])
    has_solution[0] = true;
 
    std::vector<int> inner_loop_bounds(1u << 26);
-   for (int i = 0, j = 0; i < (int)inner_loop_bounds.size(); ++i) {
-      while (j < word_bitmasks.size() && word_bitmasks[j] <= i)
+   for (int i = 1, j = 0; i < (int)inner_loop_bounds.size(); ++i) {
+      while (j < word_bitmasks.size() &&
+             __builtin_clz(word_bitmasks[j]) >= __builtin_clz(i))
          ++j;
       inner_loop_bounds[i] = j;
    }
