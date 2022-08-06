@@ -1,4 +1,4 @@
 
 wordle-finder: wordle-finder.cpp
-	g++ -o wordle-finder wordle-finder.cpp -O3
+	g++ -o wordle-finder wordle-finder.cpp -O3 -march=native
 
