@@ -36,9 +36,7 @@ This gives an algorithm where the inner loop has less than `(1u << 26) * wordlis
 iterations. We can then add the usual accounting to extract the actual solutions
 from a dynamic programming algorithm.
 
-In the process of avoiding duplicate solutions that differ only by word ordering,
-I added a slight optimization that reduced the runtime to less than 10 seconds.
-
+This gives me a runtime of less than two seconds for the `words_alpha.txt`.
 ## Building & Running
 
 You can build with a standard
